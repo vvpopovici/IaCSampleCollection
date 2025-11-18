@@ -1,0 +1,17 @@
+﻿name: selfhosted
+
+services:
+
+  agent:
+    image: agent
+    build:
+      context: ./
+      dockerfile: ./Dockerfile
+    volumes:
+      - //var/run/docker.sock:/var/run/docker.sock
+    privileged: true
+    restart: on-failure:3
+    # network_mode: host
+    env_file:
+      - .env
+    scale: ${AZP_AGENTS_REPLICAS}

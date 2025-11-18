@@ -1,0 +1,83 @@
+﻿# VVPSOLL-Deploy-Infra, https://dev.azure.com/vvp-vvproj/vvproj/_build?definitionId=2
+
+name: Infra-$(date:yyyyMMdd)$(rev:.r)-$(Build.SourceBranchName)
+
+trigger: none # Disable to not spend the free 1800 minutes per month.
+
+pool: rg-vvproj-buildagents2
+
+variables: # Most variables are consumed by PowerShell scripts.
+  SERVICE_CONNECTION: conn-VvpVvproj # SERVICE_CONNECTION's required access: Contributor, User Access Administrator (UAA)
+  CUSTOMER: vvp
+  ENV_NAME: demo
+  TERRAFORM_CONFIRM_APPLY: "false"
+  INFRA_ROOT_FOLDER: $(Build.SourcesDirectory)
+  ADJUST_AKS_API_AUTHORIZED_IP_RANGES: true
+  TERRAFORM_PLAN_DESTROY: "false"
+  # This is Let's Encrypt production server.
+  LETSENCRYPT_SERVER: "https://acme-v02.api.letsencrypt.org/directory"
+  # This is Let's Encrypt staging server, which has high rate limits,
+  # but you will have ERR_CERT_AUTHORITY_INVALID/SEC_ERROR_UNKNOWN_ISSUER error when browsing.
+  # Use this only when debugging the deployment to not exceed the rate limits.
+  # Otherwise you might be blocked for some days.
+  # LETSENCRYPT_SERVER: "https://acme-staging-v02.api.letsencrypt.org/directory"
+
+stages:
+  - stage: Deploy_Infra
+    jobs:
+      - job: Deploy_Infra
+        steps:
+          - task: KubeloginInstaller@0
+            inputs:
+              kubeloginVersion: latest
+          - task: TerraformInstaller@1
+            inputs:
+              terraformVersion: latest
+          - checkout: self # $(Build.SourceDirectory)=/home/vsts/work/1/s
+
+          - pwsh: |
+              Get-ChildItem -Path env: | Format-Table -AutoSize -Wrap | Out-String
+            name: Get_Environment_Info
+
+          - task: AzurePowerShell@5 # Initialize
+            name: Initialize
+            inputs:
+              azureSubscription: $(SERVICE_CONNECTION)
+              errorActionPreference: stop
+              failOnStandardError: true
+              pwsh: true
+              azurePowerShellVersion: LatestVersion
+              ScriptType: FilePath
+              ScriptPath: $(INFRA_ROOT_FOLDER)/deploy/scripts/Initialize-Vvpsoll-Infrastructure.ps1
+              # ScriptArguments: INFRA_ROOT_FOLDER, CUSTOMER, ENV_NAME arguments are taken by script from Environment Variables.
+              workingDirectory: $(INFRA_ROOT_FOLDER)
+
+          - task: AzureCLI@2 # TerraformApply
+            name: TerraformApply
+            inputs:
+              azureSubscription: $(SERVICE_CONNECTION)
+              scriptType: pscore
+              errorActionPreference: stop
+              failOnStandardError: true
+              scriptLocation: scriptPath
+              scriptPath: $(INFRA_ROOT_FOLDER)/deploy/scripts/Invoke-Vvpsoll-TerraformApply.ps1
+              # arguments: INFRA_ROOT_FOLDER, TERRAFORM_CONFIRM_APPLY, TFOUTPUTS_FILE arguments are taken by script from Environment Variables.
+              workingDirectory: $(INFRA_ROOT_FOLDER)
+
+          - task: AzureCLI@2 # KubeConfiguration
+            name: KubeConfiguration
+            inputs:
+              azureSubscription: $(SERVICE_CONNECTION)
+              scriptType: pscore
+              errorActionPreference: stop
+              failOnStandardError: true
+              scriptLocation: scriptPath
+              scriptPath: $(INFRA_ROOT_FOLDER)/deploy/scripts/Set-Vvpsoll-KubeConfiguration.ps1
+              # arguments: # arguments are taken from Environment Variables
+              workingDirectory: $(INFRA_ROOT_FOLDER)
+
+          - task: PublishPipelineArtifact@1
+            inputs:
+              targetPath: $(Build.SourcesDirectory)/terraform_outputs.json
+              artifact: tfoutputs
+              publishLocation: pipeline

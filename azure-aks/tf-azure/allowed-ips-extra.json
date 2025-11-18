@@ -1,0 +1,6 @@
+[
+  { "ip": "", "subnet": "",
+    "description": "Add here the public IPs that you want to allow access to the AKS API server and its deployed services.",
+    "description_line_4": "Do not use /31 subnets, because they are not supported by some Firewalls (Storage Account)."
+  }
+]

@@ -1,0 +1,13 @@
+[
+  {
+    "ip": "", "subnet": "",
+    "description_line_1": "Make sure the file is saved with UTF-8 encoding.",
+    "description_line_2": "Add here only required IPs to keep it as short as possible, because some Firewalls, like Service Bus's one, do not allow more than 128 allowed IPs.",
+    "description_line_4": "Do not use /31 subnets, because they are not supported by some Firewalls (Storage Account)."
+  },
+  { "ip": "128.0.0.1", "subnet": "32", "description": "US Southeast" },
+  { "ip": "128.0.0.2", "subnet": "32", "description": "US Southeast" },
+  { "ip": "134.0.0.1", "subnet": "32", "description": "India North" },
+  { "ip": "165.0.0.1", "subnet": "32", "description": "Qatar" },
+  { "ip": "165.0.0.2", "subnet": "32", "description": "Qatar" }
+]

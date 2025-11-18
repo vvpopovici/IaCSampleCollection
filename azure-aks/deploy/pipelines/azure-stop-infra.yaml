@@ -1,0 +1,90 @@
+﻿# VVPSOLL - [sched] Stop Infrastructure, https://dev.azure.com/vvp-vvproj/vvproj/_build?definitionId=6
+
+name: Stop-$(date:yyyyMMdd)$(rev:.r)-$(Build.SourceBranchName)
+
+trigger: none
+
+schedules:
+  - cron: "0 17 * * *" # Runs daily at given UTC (mm HH DD MM DW). It's 20:00 (8 PM) in Bucharest, 19:00 (7 PM) in Athens, 18:00 (6 PM) in Helsinki, 10:00 (10 AM) in New York, 07:00 (7 AM) in Los Angeles.
+    displayName: Daily_Evening_Run
+    branches:
+      include:
+        - main
+    always: true
+
+pool: rg-vvproj-buildagents2
+
+variables: # Most variables are consumed by PowerShell scripts.
+  SERVICE_CONNECTION: conn-VvpVvproj # SERVICE_CONNECTION's required access: Contributor, User Access Administrator (UAA)
+  CUSTOMER: vvp
+  ENV_NAME: demo
+  TFOUTPUTS_FILE: $(Pipeline.Workspace)/VVPSOLL-Deploy-Infra/tfoutputs/terraform_outputs.json
+  TERRAFORM_CONFIRM_APPLY: false
+  INFRA_ROOT_FOLDER: $(Build.SourcesDirectory)
+  SET_AKS_TO_RUNNING: false # false=stop AKS, true=start AKS
+
+resources:
+  pipelines: # Adding this just to be sure these Pipelines finished successfuly.
+    - pipeline: VVPSOLL-Deploy-Infra
+      source: VVPSOLL - Deploy Infrastructure
+      trigger: none
+
+stages:
+  - stage: Stop_Infra
+    jobs:
+      - job: Stop_Infra
+        steps:
+          - checkout: self # $(Build.SourceDirectory)=/home/vsts/work/1/s
+          - download: VVPSOLL-Deploy-Infra # $(Pipeline.Workspace)/VVPSOLL-Deploy-Infra/tfoutputs
+
+          - pwsh: |
+              Get-ChildItem -Path env: | Format-Table -AutoSize -Wrap | Out-String
+            name: Get_Environment_Info
+
+          - task: AzurePowerShell@5 # Initialize
+            name: Initialize
+            inputs:
+              azureSubscription: $(SERVICE_CONNECTION)
+              errorActionPreference: stop
+              failOnStandardError: true
+              pwsh: true
+              azurePowerShellVersion: LatestVersion
+              ScriptType: FilePath
+              # ScriptArguments: # arguments are taken from Environment Variables
+              ScriptPath: $(INFRA_ROOT_FOLDER)/deploy/scripts/Initialize-Vvpsoll-Infrastructure.ps1
+
+          - task: AzurePowerShell@5 # Stop_Infra
+            name: Stop_Infra
+            inputs:
+              azureSubscription: $(SERVICE_CONNECTION)
+              errorActionPreference: stop
+              failOnStandardError: true
+              pwsh: true
+              azurePowerShellVersion: LatestVersion
+              ScriptType: FilePath
+              # ScriptArguments: TFOUTPUTS_FILE arguments are taken by script from Environment Variables.
+              ScriptPath: $(INFRA_ROOT_FOLDER)/deploy/scripts/Stop-Vvpsoll-Infrastructure.ps1
+
+          - task: AzurePowerShell@5 # Clean_ACR
+            name: Clean_ACR
+            inputs:
+              azureSubscription: $(SERVICE_CONNECTION)
+              errorActionPreference: stop
+              failOnStandardError: true
+              pwsh: true
+              azurePowerShellVersion: LatestVersion
+              ScriptType: FilePath
+              # ScriptArguments: TFOUTPUTS_RESOURCE_GROUP_NAME, TFOUTPUTS_CONTAINER_REGISTRY_NAME, SET_AKS_TO_RUNNING arguments are taken by script from Environment Variables.
+              ScriptPath: $(INFRA_ROOT_FOLDER)/deploy/scripts/Clear-Vvpsoll-AzureContainerRegistry.ps1
+
+          - task: AzurePowerShell@5 # Clean_ServiceBusQueues
+            name: Clean_ServiceBusQueues
+            inputs:
+              azureSubscription: $(SERVICE_CONNECTION)
+              errorActionPreference: stop
+              failOnStandardError: true
+              pwsh: true
+              azurePowerShellVersion: LatestVersion
+              ScriptType: FilePath
+              # ScriptArguments: TFOUTPUTS_RESOURCE_GROUP_NAME, TFOUTPUTS_CONTAINER_REGISTRY_NAME, SET_AKS_TO_RUNNING arguments are taken by script from Environment Variables.
+              ScriptPath: $(INFRA_ROOT_FOLDER)/deploy/scripts/Clear-Vvpsoll-ServiceBusQueue.ps1

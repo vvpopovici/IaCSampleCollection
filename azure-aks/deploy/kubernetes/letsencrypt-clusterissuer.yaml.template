@@ -1,0 +1,16 @@
+﻿apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: {{ LETSENCRYPT_SERVER }}
+    # server: https://acme-v02.api.letsencrypt.org/directory # Let's Encrypt production
+    # server: https://acme-staging-v02.api.letsencrypt.org/directory # Let's Encrypt staging has no rate limits, but you will have ERR_CERT_AUTHORITY_INVALID/SEC_ERROR_UNKNOWN_ISSUER error when browsing. Use this only when debugging the deployment to not exceed the rate limits.
+    email: {{ LETSENCRYPT_EMAIL }}
+    privateKeySecretRef:
+      name: letsencrypt-prod-account-key # use this value in your app's ingress
+    solvers:
+    - http01:
+        ingress:
+          class: nginx

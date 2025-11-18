@@ -1,0 +1,421 @@
+﻿# VVPSOLL-Build-and-Deploy-Apps, https://dev.azure.com/vvp-vvproj/vvproj/_build?definitionId=1
+
+name: Build-$(date:yyyyMMdd)$(rev:.r)-$(Build.SourceBranchName)
+
+trigger: none # Disable to not spend the free 1800 minutes per month.
+
+parameters:
+  - name: UI
+    type: boolean
+    default: true
+  - name: API
+    type: boolean
+    default: true
+  - name: SERVICE
+    displayName: SERVICE+ (including models, s-ml, lib)
+    type: boolean
+    default: true
+
+pool: rg-vvproj-buildagents2
+
+variables:
+  SERVICE_CONNECTION: conn-VvpVvproj
+  STARTDATE: $[format('{0:yyyyMMdd}', pipeline.startTime)]
+  IMAGE_TAG: $(Build.BuildId)-$(STARTDATE)-$(Build.SourceBranchName)
+  VITE_API_BASE_URL: /video-upload-api
+  INFRA_ROOT_FOLDER: $(Build.SourcesDirectory)/tpi-video-analysis-infra
+  TFOUTPUTS_FILE: $(Pipeline.Workspace)/VVPSOLL-Deploy-Infra/tfoutputs/terraform_outputs.json
+  ADJUST_AKS_API_AUTHORIZED_IP_RANGES: true
+  MODELS_RESOURCE_GROUP: dan.danciu-rg
+  MODELS_STORAGE_ACCOUNT: testadslv24foldersas
+  MODELS_STORAGE_CONTAINER: models
+  MODELS_DIRECTORY: _models
+
+resources:
+  pipelines: # Adding this just to be sure these Pipelines finished successfuly.
+    - pipeline: VVPSOLL-Deploy-Infra
+      source: VVPSOLL - Deploy Infrastructure
+      trigger: none
+  repositories:
+    - repository: tpi-video-analysis-ui
+      type: github
+      endpoint: github.com_Vasile-Popovici-Vvp
+      name: ddanciu-en/tpi-video-analysis-ui
+      ref: deploy-vvp
+    - repository: tpi-upload-video-api
+      type: git
+      name: tpi-upload-video-api
+      ref: deploy-vvp
+    - repository: vvproj-ml
+      type: git
+      name: vvproj-ml
+      ref: main
+    - repository: tpi-video-analysis-lib
+      type: git
+      name: tpi-video-analysis-lib
+      ref: deploy-vvp
+    - repository: tpi-video-analysis-service
+      type: git
+      name: tpi-video-analysis-service
+      ref: deploy-vvp
+
+stages:
+
+#region BUILD
+
+  - stage: Build_UI
+    dependsOn: []
+    condition: and(succeeded(), ${{ eq(parameters.UI, true) }})
+    jobs:
+      - job: Build_and_Push_UI
+        variables:
+          APP_ROOT_FOLDER: $(Build.SourcesDirectory)/tpi-video-analysis-ui
+        steps:
+          - checkout: self # $(Build.SourcesDirectory)/tpi-video-analysis-infra
+          - checkout: tpi-video-analysis-ui # $(Build.SourcesDirectory)/tpi-video-analysis-ui
+          - download: VVPSOLL-Deploy-Infra # $(Pipeline.Workspace)/VVPSOLL-Deploy-Infra/tfoutputs
+
+          - pwsh: |
+              Get-ChildItem -Path "${env:INFRA_ROOT_FOLDER}/deploy/scripts/Build-Vvpsoll-App.ps1";
+              Get-ChildItem -Path "${env:APP_ROOT_FOLDER}/deploy/repospecifics.env";
+              Get-ChildItem -Path "${env:APP_ROOT_FOLDER}/deploy/Dockerfile";
+              Get-ChildItem -Path $env:TFOUTPUTS_FILE;
+
+              Get-ChildItem -Path env: | Format-Table -AutoSize -Wrap | Out-String;
+            name: Get_Env_Vars
+
+          - task: AzureCLI@2 # Build_and_Push
+            name: Build_and_Push
+            inputs:
+              azureSubscription: $(SERVICE_CONNECTION)
+              scriptType: pscore
+              errorActionPreference: stop
+              failOnStandardError: true
+              scriptLocation: scriptPath
+              # arguments: # arguments are taken from Environment Variables
+              scriptPath: $(INFRA_ROOT_FOLDER)/deploy/scripts/Build-Vvpsoll-App.ps1
+
+  - stage: Build_API
+    dependsOn: []
+    condition: and(succeeded(), ${{ eq(parameters.API, true) }})
+    jobs:
+      - job: Build_and_Push_API
+        variables:
+          APP_ROOT_FOLDER: $(Build.SourcesDirectory)/tpi-upload-video-api
+        steps:
+          - checkout: self # $(Build.SourcesDirectory)/tpi-video-analysis-infra
+          - checkout: tpi-upload-video-api # $(Build.SourcesDirectory)/tpi-upload-video-api
+          - download: VVPSOLL-Deploy-Infra # $(Pipeline.Workspace)/VVPSOLL-Deploy-Infra/tfoutputs
+
+          - pwsh: |
+              Get-ChildItem -Path "${env:INFRA_ROOT_FOLDER}/deploy/scripts/Build-Vvpsoll-App.ps1";
+              Get-ChildItem -Path "${env:APP_ROOT_FOLDER}/deploy/repospecifics.env";
+              Get-ChildItem -Path "${env:APP_ROOT_FOLDER}/deploy/Dockerfile";
+              Get-ChildItem -Path $env:TFOUTPUTS_FILE;
+
+              Get-ChildItem -Path env: | Format-Table -AutoSize -Wrap | Out-String;
+            name: Get_Env_Vars
+
+          - task: AzureCLI@2 # Build_and_Push
+            name: Build_and_Push
+            inputs:
+              azureSubscription: $(SERVICE_CONNECTION)
+              scriptType: pscore
+              errorActionPreference: stop
+              failOnStandardError: true
+              scriptLocation: scriptPath
+              # arguments: # arguments are taken from Environment Variables
+              scriptPath: $(INFRA_ROOT_FOLDER)/deploy/scripts/Build-Vvpsoll-App.ps1
+
+  - stage: Build_SERVICE_plus
+    dependsOn: []
+    condition: and(succeeded(), ${{ eq(parameters.SERVICE, true) }})
+    jobs:
+
+      - job: Build_and_Push_MODELS
+        variables:
+          APP_ROOT_FOLDER: $(Build.SourcesDirectory)/tpi-video-analysis-service/_models
+        steps:
+          - checkout: self # $(Build.SourcesDirectory)/tpi-video-analysis-infra
+          - checkout: tpi-video-analysis-service # $(Build.SourcesDirectory)/tpi-video-analysis-service
+            clean: true
+          - download: VVPSOLL-Deploy-Infra # $(Pipeline.Workspace)/VVPSOLL-Deploy-Infra/tfoutputs
+
+          - pwsh: |
+              Get-ChildItem -Path "${env:INFRA_ROOT_FOLDER}/deploy/scripts/Build-Vvpsoll-App.ps1";
+              Get-ChildItem -Path "${env:APP_ROOT_FOLDER}/deploy/repospecifics.env";
+              Get-ChildItem -Path "${env:APP_ROOT_FOLDER}/deploy/Dockerfile";
+              Get-ChildItem -Path $env:TFOUTPUTS_FILE;
+
+              Get-ChildItem -Path env: | Format-Table -AutoSize -Wrap | Out-String;
+            name: Get_Env_Vars
+
+          - task: AzureCLI@2 # Download MODELS
+            name: Download_MODELS
+            inputs:
+              azureSubscription: $(SERVICE_CONNECTION)
+              scriptType: pscore
+              errorActionPreference: stop
+              failOnStandardError: true
+              scriptLocation: inlineScript
+              inlineScript: |
+                Write-Host "# Generate a SAS token that expires in 30 minutes ($env:MODELS_RESOURCE_GROUP / $env:MODELS_STORAGE_ACCOUNT / $env:MODELS_STORAGE_CONTAINER / $env:MODELS_DIRECTORY)";
+
+                Write-Host "# Get the storage account key";
+                $accountKey = az storage account keys list --account-name $env:MODELS_STORAGE_ACCOUNT --resource-group $env:MODELS_RESOURCE_GROUP --query "[0].value" -o tsv;
+
+                Write-Host "# Generate the SAS token";
+                $sasExpiry = (Get-Date).ToUniversalTime().AddMinutes(30).ToString("yyyy-MM-ddTHH:mm:ssZ");
+                $sasToken = az storage container generate-sas --account-name $env:MODELS_STORAGE_ACCOUNT --account-key $accountKey --name $env:MODELS_STORAGE_CONTAINER --permissions rl --expiry $sasExpiry --https-only -o tsv;
+
+                Write-Host "# Build the source URL with the SAS token";
+                $baseUrl = "https://${env:MODELS_STORAGE_ACCOUNT}.blob.core.windows.net/${env:MODELS_STORAGE_CONTAINER}/${env:MODELS_DIRECTORY}/*";
+                $azcopySource = "${baseUrl}`?${sasToken}";
+
+                Write-Host "# Run azcopy command:";
+                $env:AZCOPY_CRED_TYPE = "Anonymous";
+                $env:AZCOPY_CONCURRENCY_VALUE = "AUTO";
+                $env:HTTPS_PROXY = "dummy.invalid";
+                $env:NO_PROXY = "*";
+                $env:https_proxy = "dummy.invalid";
+                $env:no_proxy = "*";
+                azcopy copy $azcopySource "${env:APP_ROOT_FOLDER}/volume-data/" --overwrite=true --check-md5=FailIfDifferent --from-to=BlobLocal --recursive --log-level=INFO;
+
+                Write-Host "# Check downloaded files are there:";
+                $files = Get-ChildItem -Path "${env:APP_ROOT_FOLDER}/volume-data/" -Recurse -Exclude .gitkeep;
+                if ( $files.count -le 0 ) {
+                  throw "Nothing downloaded!? Check previous operations are ok.";
+                };
+
+                Write-Host "# Create and output list-of-files.txt:"
+                $files `
+                  | Select-Object -Property LastWriteTimeUtc, Length, FullName `
+                  | Sort-Object -Property FullName `
+                  | ConvertTo-Csv `
+                  | Out-File "${env:APP_ROOT_FOLDER}/list-of-files.txt";
+                Get-Content -Path "${env:APP_ROOT_FOLDER}/list-of-files.txt" -Raw;
+
+          - task: AzureCLI@2 # Build_and_Push
+            name: Build_and_Push
+            inputs:
+              azureSubscription: $(SERVICE_CONNECTION)
+              scriptType: pscore
+              errorActionPreference: stop
+              failOnStandardError: true
+              scriptLocation: scriptPath
+              # arguments: # arguments are taken from Environment Variables
+              scriptPath: $(INFRA_ROOT_FOLDER)/deploy/scripts/Build-Vvpsoll-App.ps1
+
+      - job: Build_and_Push_SML
+        variables:
+          APP_ROOT_FOLDER: $(Build.SourcesDirectory)/vvproj-ml
+        steps:
+          - checkout: self # $(Build.SourcesDirectory)/tpi-video-analysis-infra
+          - checkout: vvproj-ml # $(Build.SourcesDirectory)/vvproj-ml
+          - download: VVPSOLL-Deploy-Infra # $(Pipeline.Workspace)/VVPSOLL-Deploy-Infra/tfoutputs
+
+          - pwsh: |
+              Get-ChildItem -Path "${env:INFRA_ROOT_FOLDER}/deploy/scripts/Build-Vvpsoll-App.ps1";
+              Get-ChildItem -Path "${env:APP_ROOT_FOLDER}/deploy/repospecifics.env";
+              Get-ChildItem -Path "${env:APP_ROOT_FOLDER}/deploy/Dockerfile";
+              Get-ChildItem -Path $env:TFOUTPUTS_FILE;
+
+              Get-ChildItem -Path env: | Format-Table -AutoSize -Wrap | Out-String;
+            name: Get_Env_Vars
+
+          - task: AzureCLI@2 # Build_and_Push
+            name: Build_and_Push
+            inputs:
+              azureSubscription: $(SERVICE_CONNECTION)
+              scriptType: pscore
+              errorActionPreference: stop
+              failOnStandardError: true
+              scriptLocation: scriptPath
+              # arguments: # arguments are taken from Environment Variables
+              scriptPath: $(INFRA_ROOT_FOLDER)/deploy/scripts/Build-Vvpsoll-App.ps1
+
+      - job: Build_and_Push_LIB
+        variables:
+          APP_ROOT_FOLDER: $(Build.SourcesDirectory)/tpi-video-analysis-lib
+        steps:
+          - checkout: self # $(Build.SourcesDirectory)/tpi-video-analysis-infra
+          - checkout: tpi-video-analysis-lib # $(Build.SourcesDirectory)/tpi-video-analysis-lib
+          - download: VVPSOLL-Deploy-Infra # $(Pipeline.Workspace)/VVPSOLL-Deploy-Infra/tfoutputs
+
+          - pwsh: |
+              Get-ChildItem -Path "${env:INFRA_ROOT_FOLDER}/deploy/scripts/Build-Vvpsoll-App.ps1";
+              Get-ChildItem -Path "${env:APP_ROOT_FOLDER}/deploy/repospecifics.env";
+              Get-ChildItem -Path "${env:APP_ROOT_FOLDER}/deploy/Dockerfile";
+              Get-ChildItem -Path $env:TFOUTPUTS_FILE;
+
+              Get-ChildItem -Path env: | Format-Table -AutoSize -Wrap | Out-String;
+            name: Get_Env_Vars
+
+          - task: AzureCLI@2 # Build_and_Push
+            name: Build_and_Push
+            inputs:
+              azureSubscription: $(SERVICE_CONNECTION)
+              scriptType: pscore
+              errorActionPreference: stop
+              failOnStandardError: true
+              scriptLocation: scriptPath
+              # arguments: # arguments are taken from Environment Variables
+              scriptPath: $(INFRA_ROOT_FOLDER)/deploy/scripts/Build-Vvpsoll-App.ps1
+
+          - pwsh: |
+              Write-Host "# VVPSOLL_LIB_IMAGE=${env:IMAGE_REGISTRY}/${env:IMAGE_REPO_VVPSOLL_LIB}:${env:IMAGE_TAG} -> ${env:INFRA_ROOT_FOLDER}/libversions.env";
+              Set-Content -Path "${env:INFRA_ROOT_FOLDER}/libversions.env" -Value "VVPSOLL_LIB_IMAGE=${env:IMAGE_REGISTRY}/${env:IMAGE_REPO_VVPSOLL_LIB}:${env:IMAGE_TAG_VVPSOLL_LIB}";
+
+          - task: PublishPipelineArtifact@1
+            inputs:
+              targetPath: $(INFRA_ROOT_FOLDER)/libversions.env
+              artifact: libversions
+              publishLocation: pipeline
+
+      - job: Build_and_Push_SERVICE
+        dependsOn: Build_and_Push_LIB
+        variables:
+          APP_ROOT_FOLDER: $(Build.SourcesDirectory)/tpi-video-analysis-service
+        steps:
+          - checkout: self # $(Build.SourcesDirectory)/tpi-video-analysis-infra
+          - checkout: tpi-video-analysis-service # $(Build.SourcesDirectory)/tpi-video-analysis-service
+          - download: VVPSOLL-Deploy-Infra # $(Pipeline.Workspace)/VVPSOLL-Deploy-Infra/tfoutputs
+          - download: current # $(Pipeline.Workspace)/libversions/libversions.env
+
+          - pwsh: |
+              Get-ChildItem -Path "${env:INFRA_ROOT_FOLDER}/deploy/scripts/Build-Vvpsoll-App.ps1";
+              Get-ChildItem -Path "${env:APP_ROOT_FOLDER}/deploy/repospecifics.env";
+              Get-ChildItem -Path "${env:APP_ROOT_FOLDER}/deploy/Dockerfile";
+              Get-ChildItem -Path $env:TFOUTPUTS_FILE;
+              Get-ChildItem -Path "$(Pipeline.Workspace)/libversions/libversions.env";
+
+              Write-Host "# Get VVPSOLL_LIB_IMAGE from libversions.env:";
+                Get-Content -Path "$(Pipeline.Workspace)/libversions/libversions.env" -Raw;
+                $env:VVPSOLL_LIB_IMAGE = $(Get-Content -Path "$(Pipeline.Workspace)/libversions/libversions.env" | ConvertFrom-StringData).VVPSOLL_LIB_IMAGE;
+                Write-Host "#   env:VVPSOLL_LIB_IMAGE = ${env:VVPSOLL_LIB_IMAGE}";
+                Write-Host "##vso[task.setvariable variable=VVPSOLL_LIB_IMAGE; issecret=false; isoutput=true]${env:VVPSOLL_LIB_IMAGE}";
+
+              Get-ChildItem -Path env: | Format-Table -AutoSize -Wrap | Out-String;
+            name: Get_Env_Vars
+
+          - task: AzureCLI@2 # Build_and_Push
+            name: Build_and_Push
+            inputs:
+              azureSubscription: $(SERVICE_CONNECTION)
+              scriptType: pscore
+              errorActionPreference: stop
+              failOnStandardError: true
+              scriptLocation: scriptPath
+              # arguments: # arguments are taken from Environment Variables
+              scriptPath: $(INFRA_ROOT_FOLDER)/deploy/scripts/Build-Vvpsoll-App.ps1
+
+#endregion BUILD
+
+#region DEPLOY
+
+  - stage: Deploy_UI
+    dependsOn: [Build_UI]
+    condition: and(succeeded(), ${{ eq(parameters.UI, true) }})
+    jobs:
+      - job: Deploy_UI
+        variables:
+          APP_ROOT_FOLDER: $(Build.SourcesDirectory)/tpi-video-analysis-ui
+        steps:
+          - task: KubeloginInstaller@0
+            inputs:
+              kubeloginVersion: latest
+          - checkout: self # $(Build.SourcesDirectory)/tpi-video-analysis-infra
+          - checkout: tpi-video-analysis-ui # $(Build.SourcesDirectory)/tpi-video-analysis-ui
+          - download: VVPSOLL-Deploy-Infra # $(Pipeline.Workspace)/VVPSOLL-Deploy-Infra/tfoutputs
+
+          - pwsh: |
+              Get-ChildItem -Path "${env:INFRA_ROOT_FOLDER}/deploy/scripts/Deploy-Vvpsoll-AppToKubernetes.ps1";
+              Get-ChildItem -Path "${env:APP_ROOT_FOLDER}/deploy/repospecifics.env";
+              Get-ChildItem -Path "${env:APP_ROOT_FOLDER}/deploy/Dockerfile";
+              Get-ChildItem -Path $env:TFOUTPUTS_FILE;
+
+              Get-ChildItem -Path env: | Format-Table -AutoSize -Wrap | Out-String;
+            name: Get_Env_Vars
+
+          - task: AzureCLI@2 # Deploy
+            name: Deploy
+            inputs:
+              azureSubscription: $(SERVICE_CONNECTION)
+              scriptType: pscore
+              errorActionPreference: stop
+              failOnStandardError: true
+              scriptLocation: scriptPath
+              # arguments: # arguments are taken from Environment Variables
+              scriptPath: $(INFRA_ROOT_FOLDER)/deploy/scripts/Deploy-Vvpsoll-AppToKubernetes.ps1
+
+  - stage: Deploy_API
+    dependsOn: [Build_API]
+    condition: and(succeeded(), ${{ eq(parameters.API, true) }})
+    jobs:
+      - job: Deploy_API
+        variables:
+          APP_ROOT_FOLDER: $(Build.SourcesDirectory)/tpi-upload-video-api
+        steps:
+          - task: KubeloginInstaller@0
+            inputs:
+              kubeloginVersion: latest
+          - checkout: self # $(Build.SourcesDirectory)/tpi-video-analysis-infra
+          - checkout: tpi-upload-video-api # $(Build.SourcesDirectory)/tpi-upload-video-api
+          - download: VVPSOLL-Deploy-Infra # $(Pipeline.Workspace)/VVPSOLL-Deploy-Infra/tfoutputs
+
+          - pwsh: |
+              Get-ChildItem -Path "${env:INFRA_ROOT_FOLDER}/deploy/scripts/Deploy-Vvpsoll-AppToKubernetes.ps1";
+              Get-ChildItem -Path "${env:APP_ROOT_FOLDER}/deploy/repospecifics.env";
+              Get-ChildItem -Path "${env:APP_ROOT_FOLDER}/deploy/Dockerfile";
+              Get-ChildItem -Path $env:TFOUTPUTS_FILE;
+
+              Get-ChildItem -Path env: | Format-Table -AutoSize -Wrap | Out-String;
+            name: Get_Env_Vars
+
+          - task: AzureCLI@2 # Deploy
+            name: Deploy
+            inputs:
+              azureSubscription: $(SERVICE_CONNECTION)
+              scriptType: pscore
+              errorActionPreference: stop
+              failOnStandardError: true
+              scriptLocation: scriptPath
+              # arguments: # arguments are taken from Environment Variables
+              scriptPath: $(INFRA_ROOT_FOLDER)/deploy/scripts/Deploy-Vvpsoll-AppToKubernetes.ps1
+
+  - stage: Deploy_SERVICE
+    dependsOn: [Build_SERVICE_plus]
+    condition: and(succeeded(), ${{ eq(parameters.SERVICE, true) }})
+    jobs:
+      - job: Deploy_SERVICE
+        variables:
+          APP_ROOT_FOLDER: $(Build.SourcesDirectory)/tpi-video-analysis-service
+        steps:
+          - task: KubeloginInstaller@0
+            inputs:
+              kubeloginVersion: latest
+          - checkout: self # $(Build.SourcesDirectory)/tpi-video-analysis-infra
+          - checkout: tpi-video-analysis-service # $(Build.SourcesDirectory)/tpi-video-analysis-service
+          - download: VVPSOLL-Deploy-Infra # $(Pipeline.Workspace)/VVPSOLL-Deploy-Infra/tfoutputs
+
+          - pwsh: |
+              Get-ChildItem -Path "${env:INFRA_ROOT_FOLDER}/deploy/scripts/Deploy-Vvpsoll-AppToKubernetes.ps1";
+              Get-ChildItem -Path "${env:APP_ROOT_FOLDER}/deploy/repospecifics.env";
+              Get-ChildItem -Path "${env:APP_ROOT_FOLDER}/deploy/Dockerfile";
+              Get-ChildItem -Path $env:TFOUTPUTS_FILE;
+
+              Get-ChildItem -Path env: | Format-Table -AutoSize -Wrap | Out-String;
+            name: Get_Env_Vars
+
+          - task: AzureCLI@2 # Deploy
+            name: Deploy
+            inputs:
+              azureSubscription: $(SERVICE_CONNECTION)
+              scriptType: pscore
+              errorActionPreference: stop
+              failOnStandardError: true
+              scriptLocation: scriptPath
+              # arguments: # arguments are taken from Environment Variables
+              scriptPath: $(INFRA_ROOT_FOLDER)/deploy/scripts/Deploy-Vvpsoll-AppToKubernetes.ps1
+
+#endregion DEPLOY
