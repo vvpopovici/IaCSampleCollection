@@ -1,0 +1,13 @@
+subscription_id     = "{{ SUBSCRIPTION_ID }}"
+resource_group_name = "{{ TFBACKEND_RESOURCE_GROUP_NAME }}"
+solution_name       = "{{ SOLUTION_NAME }}"
+customer_name       = "{{ CUSTOMER }}"
+env_name            = "{{ ENV_NAME }}"
+
+container_registry_sku                = "Basic"
+container_registry_authorization_rbac = true
+storage_authorization_rbac            = false
+servicebus_authorization_rbac         = false
+
+aks_admin_group_object_id = "{{ AKS_ADMIN_GROUP_OBJECT_ID }}"
+aks_admin_group_name      = "{{ AKS_ADMIN_GROUP_NAME }}"
