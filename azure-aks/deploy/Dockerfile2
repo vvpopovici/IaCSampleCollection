@@ -1,0 +1,20 @@
+FROM python:3.10-slim
+
+# Setting DEBCONF_NOWARNINGS=yes to avoid debconf warnings related to apt-utils package.
+# Setting DEBIAN_FRONTEND=noninteractive to avoid debconf interactive messages.
+RUN DEBCONF_NOWARNINGS=yes DEBIAN_FRONTEND=noninteractive apt-get update -q && \
+  # Install required packages for Data Extract, including gcc compiler and opencv prerequisites
+  DEBCONF_NOWARNINGS=yes apt-get install -yq rsync dos2unix && \
+  # Clean the APT cache and files to have the Docker Image smaller.
+  apt-get -yq clean && apt-get -yq autoclean && apt-get -yq autoremove && rm -rf /var/lib/apt-get/lists/* /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY ./ ./volume-data/
+
+ENV SOURCE_PATH='/app/volume-data/' VOLUME_PATH='/vv-ml/'
+RUN dos2unix ./volume-data/deploy/scripts/volume-data-rsync.sh && chmod +x ./volume-data/deploy/scripts/volume-data-rsync.sh
+
+VOLUME [ "/vvp-ml" ]
+
+CMD [ "bash", "./volume-data/deploy/scripts/volume-data-rsync.sh", "$SOURCE_PATH", "$VOLUME_PATH" ]

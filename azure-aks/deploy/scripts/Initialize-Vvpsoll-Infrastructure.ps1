@@ -18,7 +18,7 @@ param (
   [string] $Customer = $env:CUSTOMER ? $env:CUSTOMER : "vvp",
   [string] $EnvName = $env:ENV_NAME ? $env:ENV_NAME : "demo",
   [string] $Location = "germanywestcentral",
-  [string] $AksAdminGroupName = "vvp\\\\Vvproj-AiVision-group",
+  [string] $AksAdminGroupName = "vvp\\\\Vvproj-vvpsoll-group",
   # EntraID Object ID of $AksAdminGroupName
   [string] $AksAdminObjectId = "<Get the Object ID from EntraID>" ,
   [string] $LetsEncryptEmail = "vvp.vvp@vvp.com",

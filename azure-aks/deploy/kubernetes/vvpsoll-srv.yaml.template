@@ -1,0 +1,93 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ APP_NAME }}-sa
+  namespace: {{ TFOUTPUTS_SOLUTION_NAME }}
+  annotations:
+    azure.workload.identity/client-id: {{ TFOUTPUTS_AKS_POOL_IDENTITY_CLIENT_ID }}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ APP_NAME }}
+  namespace: {{ TFOUTPUTS_SOLUTION_NAME }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ APP_NAME }}
+  template:
+    metadata:
+      labels:
+        app: {{ APP_NAME }}
+    spec:
+      nodeSelector:
+        kubernetes.io/os: linux
+        mode: user
+        type: gpu
+      tolerations:
+        - key: "sku"
+          operator: "Equal"
+          value: "gpu"
+          effect: "NoSchedule"
+      serviceAccountName: {{ APP_NAME }}-sa
+      initContainers:
+        - name: {{ TFOUTPUTS_SOLUTION_NAME }}-mdl
+          image: {{ TFOUTPUTS_CONTAINER_REGISTRY_LOGIN_SERVER }}/{{ TFOUTPUTS_SOLUTION_NAME }}-mdl:{{ IMAGE_TAG }}
+          imagePullPolicy: Always
+          volumeMounts:
+            - name: models
+              mountPath: /_models
+        - name: {{ TFOUTPUTS_SOLUTION_NAME }}-sml
+          image: {{ TFOUTPUTS_CONTAINER_REGISTRY_LOGIN_SERVER }}/{{ TFOUTPUTS_SOLUTION_NAME }}-sml:{{ IMAGE_TAG }}
+          imagePullPolicy: Always
+          volumeMounts:
+            - name: vvp-ml
+              mountPath: /vvp-ml
+      containers:
+        - name: {{ APP_NAME }}
+          image: {{ TFOUTPUTS_CONTAINER_REGISTRY_LOGIN_SERVER }}/{{ APP_NAME }}:{{ IMAGE_TAG }}
+          imagePullPolicy: Always
+          resources:
+            limits:
+              nvidia.com/gpu: 1
+          env:
+            - name: SERVICEBUS_CONNECTION_STRING
+              valueFrom:
+                secretKeyRef:
+                  name: servicebus
+                  key: connection-string
+            - name: ANALYSIS_REQUEST_QUEUE
+              value: {{ TFOUTPUTS_SERVICEBUS_REQUESTS_QUEUE_NAME }}
+            - name: ANALYSIS_RESPONSE_QUEUE
+              value: {{ TFOUTPUTS_SERVICEBUS_RESPONSE_QUEUE_NAME }}
+            - name: MOCK_ASSESSMENT
+              value: "False" # True=No GPU, False=Use GPU
+            - name: MODELS_BASE_PATH
+              value: "/_models"
+            - name: VVP_ML_WORKSPACE
+              value: "/vvp-ml"
+          volumeMounts:
+            - name: models
+              mountPath: /_models
+            - name: vvp-ml
+              mountPath: /vvp-ml
+
+            - name: secrets-store
+              mountPath: /mnt/secrets-store
+              readOnly: true
+
+      volumes:
+        - name: models
+          emptyDir: {}
+        - name: vvp-ml
+          emptyDir: {}
+
+        - name: secrets-store
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: azure-keyvault

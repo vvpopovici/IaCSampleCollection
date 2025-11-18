@@ -109,11 +109,11 @@ helm upgrade --install ingress-nginx ingress-nginx `
   --set controller.service.annotations."service\.beta\.kubernetes\.io/azure-dns-label-name"="vvpsoll-vvp-demo"
 
 # Break the lease for tfstate file
-  az storage blob show --account-name "satfbackendaivisiondemo" --container-name "tfbackend-aivision-demo" --name "terraform.tfstate" --auth-mode login --query "properties.lease"
-  az storage blob lease break --container-name "tfbackend-aivision-demo" --account-name "satfbackendaivisiondemo" --blob-name "terraform.tfstate" --auth-mode login
+  az storage blob show --account-name "satfbackendvvpsolldemo" --container-name "tfbackend-vvpsoll-demo" --name "terraform.tfstate" --auth-mode login --query "properties.lease"
+  az storage blob lease break --container-name "tfbackend-vvpsoll-demo" --account-name "satfbackendvvpsolldemo" --blob-name "terraform.tfstate" --auth-mode login
 
 # Remove lock file
-  az storage blob list --account-name "satfbackendaivisiondemo" --container-name "tfbackend-aivision-demo" --auth-mode login --query "[?name=='terraform.tfstate'].name"
-  az storage blob delete --account-name "satfbackendaivisiondemo" --container-name "tfbackend-aivision-demo" --name "terraform.tfstate.lock.info" --auth-mode login
+  az storage blob list --account-name "satfbackendvvpsolldemo" --container-name "tfbackend-vvpsoll-demo" --auth-mode login --query "[?name=='terraform.tfstate'].name"
+  az storage blob delete --account-name "satfbackendvvpsolldemo" --container-name "tfbackend-vvpsoll-demo" --name "terraform.tfstate.lock.info" --auth-mode login
 
 #endregion

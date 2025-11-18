@@ -14,4 +14,4 @@ echo -e "\n### Rsync-ing files from '${source}' to '${target}'...\n"
 
 rsync -vrh --delete-after --stats "$source" "$target"
 
-echo -e "\n### Rsync finished.\n"
+echo -e "\n### Rsync to ${target} finished.\n"
