@@ -21,9 +21,9 @@ stages:
           - publish: $(Build.ArtifactStagingDirectory)
             artifact: drop
 
-  - stage: Deploy_To_${{ parameters.Environment | upper }}
+  - stage: Deploy_To_${{ upper(parameters.Environment) }}
     jobs:
-      - job: Deploy_To_${{ parameters.Environment | upper }}
+      - job: Deploy_To_${{ upper(parameters.Environment) }}
         steps:
           - download: current
           - script: echo "Deploy to ${{ parameters.Environment }} environment..."
