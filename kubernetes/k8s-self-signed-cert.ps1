@@ -26,6 +26,9 @@ docker run --rm -it -v "${PWD}/:/certs/" alpine/openssl `
 # Upload the TLS secret into Kubernetes
 kubectl create secret tls "self-signed-tls-${aDomain}" --key "${aDomain}.key" --cert "${aDomain}.crt" --dry-run=client -o yaml | kubectl apply -f -
 
+# Clear existing certs in CurrentUser\Root
+Get-ChildItem -Path Cert:\CurrentUser\Root | Where-Object Subject -eq "CN=${aDomain}" | Remove-Item -Verbose
+
 # Import the self-signed certificate into Windows Trusted Root Certification Authorities
 Import-Certificate -FilePath "${aDomain}.crt" -CertStoreLocation "Cert:\CurrentUser\Root\" -Verbose
 
