@@ -33,25 +33,26 @@ Import-Certificate -FilePath "${aDomain}.crt" -CertStoreLocation "Cert:\CurrentU
 helm repo add "ingress-nginx" "https://kubernetes.github.io/ingress-nginx"
 helm repo update
 helm search repo ingress-nginx
-helm upgrade --install "ingress-nginx" "ingress-nginx/ingress-nginx" --version 4.14.0 `
-  --namespace "ingress-nginx" --create-namespace --hide-notes `
+helm upgrade --hide-notes `
+  --install "ingress-nginx" "ingress-nginx/ingress-nginx" `
+  --namespace "ingress-nginx" --create-namespace `
   --set controller.replicaCount=1
 
 # Deploy an app
-kubectl delete deployment blog-app --ignore-not-found
-kubectl delete service blog-app --ignore-not-found
+kubectl create deployment app1 --image=nginx:latest --dry-run=client -o yaml | kubectl apply -f -
+kubectl expose deployment app1 --port=80 --target-port=80 --type=ClusterIP --dry-run=client -o yaml | kubectl apply -f -
 
-kubectl create deployment blog-app --image=nginx:latest --dry-run=client -o yaml | kubectl apply -f -
-kubectl expose deployment blog-app --port=80 --target-port=80 --type=ClusterIP --dry-run=client -o yaml | kubectl apply -f -
+# Deploy Ingress for the app with TLS in root (/)
+kubectl create ingress app1 --class=nginx --rule="${aDomain}/=app1:80,tls=self-signed-tls-${aDomain}" --dry-run=client -o yaml | kubectl apply -f -
 
-kubectl create ingress blog-ingress --class=nginx --rule="${aDomain}/=blog-app:80,tls=self-signed-tls-${aDomain}" --dry-run=client -o yaml | kubectl apply -f -
-curl -ivv "https://${aDomain}/"
+curl -iv "https://${aDomain}/"
 
+# Update Ingress for the app with TLS in path /app1 and annotations for regex.
 @"
   apiVersion: networking.k8s.io/v1
   kind: Ingress
   metadata:
-    name: blog-ingress
+    name: app1
     annotations:
       nginx.ingress.kubernetes.io/use-regex: "true"
       nginx.ingress.kubernetes.io/rewrite-target: /$2
@@ -66,13 +67,18 @@ curl -ivv "https://${aDomain}/"
       - host: ${aDomain}
         http:
           paths:
-            - path: /blog(/|$)(.*)
+            - path: /app1(/|$)(.*)
               pathType: ImplementationSpecific
               backend:
                 service:
-                  name: blog-app
+                  name: app1
                   port:
                     number: 80
 "@ | kubectl apply -f -
 
-curl -iv "https://${aDomain}/blog"
+curl -iv "https://${aDomain}/app1"
+
+# Cleanup
+kubectl delete deployment app1 --ignore-not-found
+kubectl delete service app1 --ignore-not-found
+kubectl delete ingress app1 --ignore-not-found

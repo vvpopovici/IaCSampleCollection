@@ -1,6 +1,6 @@
 ﻿trigger: none
 
-resource:
+resources:
   pipelines:
     - pipeline: BuildPipeline
       source: 03-build-and-deploy-to-selected

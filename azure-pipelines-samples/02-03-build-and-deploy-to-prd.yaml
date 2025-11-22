@@ -1,4 +1,6 @@
-﻿trigger: none
+﻿name: $(Date:yyyyMMdd)-$(rev:rr)-PRD-$(SourceBranchName) # == $(Build.BuildNumber)
+
+trigger: none
 
 stages:
 

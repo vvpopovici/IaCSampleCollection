@@ -1,4 +1,6 @@
-﻿trigger: none
+﻿name: $(Date:yyyyMMdd)-$(rev:rr)-${{ upper(parameters.Environment) }}-$(SourceBranchName) # == $(Build.BuildNumber)
+
+trigger: none
 
 parameters:
   - name: Environment
@@ -9,16 +11,16 @@ parameters:
       - stg
       - prd
 
-resource:
+resources:
   pipelines:
     - pipeline: BuildPipeline
       source: 03-build-and-deploy-to-selected
 
 stages:
 
-  - stage: Deploy_To_${{ parameters.Environment | upper }}
+  - stage: Deploy_To_${{ upper(parameters.Environment) }}
     jobs:
-      - job: Deploy_To_${{ parameters.Environment | upper }}
+      - job: Deploy_To_${{ upper(parameters.Environment) }}
         steps:
           - download: BuildPipeline
           - script: echo "Deploy to ${{ parameters.Environment }} environment..."

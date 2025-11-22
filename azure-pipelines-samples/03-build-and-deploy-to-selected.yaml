@@ -1,4 +1,6 @@
-﻿trigger: none
+﻿name: $(Date:yyyyMMdd)-$(rev:rr)-${{ upper(parameters.Environment) }}-$(SourceBranchName) # == $(Build.BuildNumber)
+
+trigger: none
 
 parameters:
   - name: Environment

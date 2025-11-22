@@ -26,7 +26,7 @@ stages:
               echo "Run Unit Tests..."
               echo "Run Unit Tests..." > $(Build.ArtifactStagingDirectory)/test_results.txt
           - publish: $(Build.ArtifactStagingDirectory)
-            artifact: testresults
+            artifact: unittestresults
 
       - job: IntegrationTests
         steps:
@@ -35,4 +35,4 @@ stages:
               echo "Run Integration Tests..."
               echo "Run Integration Tests..." > $(Build.ArtifactStagingDirectory)/test_results.txt
           - publish: $(Build.ArtifactStagingDirectory)
-            artifact: testresults
+            artifact: integrationtestresults
