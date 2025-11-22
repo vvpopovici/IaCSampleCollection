@@ -1,0 +1,15 @@
+﻿trigger: none
+
+resource:
+  pipelines:
+    - pipeline: BuildPipeline
+      source: 03-build-and-deploy-to-selected
+
+stages:
+
+  - stage: Deploy_To_STG
+    jobs:
+      - job: Deploy_To_STG
+        steps:
+          - download: BuildPipeline
+          - script: echo "Deploy to STG environment..."

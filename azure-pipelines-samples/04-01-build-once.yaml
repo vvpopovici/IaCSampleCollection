@@ -1,0 +1,38 @@
+﻿trigger: none
+
+stages:
+
+  - stage: Build
+    jobs:
+      - job: CodeScan
+        steps:
+          - script: echo "Run SAST Analysis..."
+          - script: echo "Linting the code..."
+
+      - job: Build
+        steps:
+          - script: |
+              echo "Build the code..."
+              echo "Build the code..." > $(Build.ArtifactStagingDirectory)/build_output.txt
+          - publish: $(Build.ArtifactStagingDirectory)
+            artifact: drop
+
+  - stage: Test
+    jobs:
+      - job: UnitTests
+        steps:
+          - download: current
+          - script: |
+              echo "Run Unit Tests..."
+              echo "Run Unit Tests..." > $(Build.ArtifactStagingDirectory)/test_results.txt
+          - publish: $(Build.ArtifactStagingDirectory)
+            artifact: testresults
+
+      - job: IntegrationTests
+        steps:
+          - script: echo "Install prerequisites..."
+          - script: |
+              echo "Run Integration Tests..."
+              echo "Run Integration Tests..." > $(Build.ArtifactStagingDirectory)/test_results.txt
+          - publish: $(Build.ArtifactStagingDirectory)
+            artifact: testresults

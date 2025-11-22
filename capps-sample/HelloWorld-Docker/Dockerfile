@@ -1,16 +1,17 @@
-﻿# docker build ./ -t helloworld -f Dockerfile-helloworld
-# docker run -p 5000:5000 --rm -it helloworld
-# docker run -p 5001:5001 -e PORT=5001 --rm -it helloworld
+﻿# docker build ./ -t helloworld
+# docker run --rm -p 5000:5000 -it helloworld
+# docker run --rm -p 5001:5001 -e PORT=5001 -it helloworld
 
 ARG IMAGE=python:3.9-slim-buster
 # ARG IMAGE=mcr.microsoft.com/azure-functions/python:4-python3.9
 FROM $IMAGE
 
 ENV PORT=5000
+ENV APP_VERSION=unknown
 
 WORKDIR /
 # The "<link rel=..." part is required to avoid requests to /favicon.ico
-# RUN echo '<link rel="shortcut icon" href="#" /> Hello world!' > /index.html
+RUN echo '<link rel="shortcut icon" href="#" /> Hello world!' > /index.html
 RUN echo 'Hello world!' > /index.html
 
 HEALTHCHECK --interval=30s --timeout=30s --start-period=30s --retries=3 CMD python -c "import socket; socket.setdefaulttimeout(5); socket.create_connection((f'127.0.0.1', ${PORT}))"
@@ -19,5 +20,5 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=30s --retries=3 CMD pyth
 
 COPY ./startup.py /
 COPY ./favicon.ico /
-CMD [ "/startup.py" ]
 
+CMD [ "python", "/startup.py" ]

@@ -1,0 +1,29 @@
+﻿trigger: none
+
+parameters:
+  - name: Environment
+    type: string
+    default: dev
+    values:
+      - dev
+      - stg
+      - prd
+
+stages:
+
+  - stage: Build
+    jobs:
+      - job: Build
+        steps:
+          - script: |
+              echo "Build the code..."
+              echo "Build the code..." > $(Build.ArtifactStagingDirectory)/build_output.txt
+          - publish: $(Build.ArtifactStagingDirectory)
+            artifact: drop
+
+  - stage: Deploy_To_${{ parameters.Environment | upper }}
+    jobs:
+      - job: Deploy_To_${{ parameters.Environment | upper }}
+        steps:
+          - download: current
+          - script: echo "Deploy to ${{ parameters.Environment }} environment..."

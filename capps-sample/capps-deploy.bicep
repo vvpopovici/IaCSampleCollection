@@ -55,7 +55,7 @@
   }
 //endregion Variables
 
-resource virtualNetwork 'Microsoft.Network/virtualNetworks@2022-09-01' = {
+resource virtualNetwork 'Microsoft.Network/virtualNetworks@2024-07-01' = {
   name: virtualNetworkName
   location: location
   properties: {
@@ -64,33 +64,26 @@ resource virtualNetwork 'Microsoft.Network/virtualNetworks@2022-09-01' = {
         virtualNetworkCidr
       ]
     }
-    subnets: [
-      {// subnetKubeName
-        name: subnetKubeName
-        properties: {
-          addressPrefix: subnetKubeCidr
-          privateEndpointNetworkPolicies: 'Disabled'
-          serviceEndpoints: [
-            {
-              service: 'Microsoft.Storage'
-              locations: [
-                location
-              ]
-            }
-            {
-              service: 'Microsoft.CognitiveServices'
-              locations: [
-                location
-              ]
-            }
-          ]
-          delegations: []
-        }
-      }
-    ]
   }
-  resource subnetKube 'subnets' existing = {
+
+  resource subnetKube 'subnets' = {
     name: subnetKubeName
+    properties: {
+      addressPrefix: subnetKubeCidr
+      privateEndpointNetworkPolicies: 'Disabled'
+      serviceEndpoints: [
+        {
+          service: 'Microsoft.Storage'
+          locations: [ location ]
+        }
+        {
+          service: 'Microsoft.CognitiveServices'
+          locations: [ location ]
+        }
+      ]
+      delegations: []
+    }
+
   }
 }
 
@@ -100,7 +93,7 @@ module logAnalyticsWorkspace './logAnalyticsWorkspace.bicep' = {
     name: logAnalyticsWorkspaceName
     tags: tags
     location: location
-    keyVaultName: '' // Empty value means Key Vault is not required. After KeyVault is created we re run this module with KeyVault name.
+    keyVaultName: '' // Empty value means Key Vault is not required. After KeyVault is created we re-run this module with KeyVault name.
   }
 }
 

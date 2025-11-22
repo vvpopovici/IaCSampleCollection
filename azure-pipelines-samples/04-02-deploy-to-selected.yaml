@@ -1,0 +1,24 @@
+﻿trigger: none
+
+parameters:
+  - name: Environment
+    type: string
+    default: dev
+    values:
+      - dev
+      - stg
+      - prd
+
+resource:
+  pipelines:
+    - pipeline: BuildPipeline
+      source: 03-build-and-deploy-to-selected
+
+stages:
+
+  - stage: Deploy_To_${{ parameters.Environment | upper }}
+    jobs:
+      - job: Deploy_To_${{ parameters.Environment | upper }}
+        steps:
+          - download: BuildPipeline
+          - script: echo "Deploy to ${{ parameters.Environment }} environment..."

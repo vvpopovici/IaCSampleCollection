@@ -1,0 +1,20 @@
+﻿trigger: none
+
+stages:
+
+  - stage: Build
+    jobs:
+      - job: Build
+        steps:
+          - script: |
+              echo "Build the code..."
+              echo "Build the code..." > $(Build.ArtifactStagingDirectory)/build_output.txt
+          - publish: $(Build.ArtifactStagingDirectory)
+            artifact: drop
+
+  - stage: Deploy_To_STG
+    jobs:
+      - job: Deploy_To_STG
+        steps:
+          - download: current
+          - script: echo "Deploy to Staging environment..."
